@@ -992,4 +992,21 @@ tasks.named('stringTemplates').configure {
     it.inputFile = rateAggregatorInputFile
     it.outputFile = "org/elasticsearch/compute/aggregation/RateLongGroupingAggregatorFunction.java"
   }
+
+  File varianceAggregatorInputFile = file("src/main/java/org/elasticsearch/compute/aggregation/X-StdVarianceGroupingAggregatorFunction.java.st")
+  template {
+    it.properties = intProperties
+    it.inputFile = varianceAggregatorInputFile
+    it.outputFile = "org/elasticsearch/compute/aggregation/StdVarianceIntGroupingAggregatorFunction.java"
+  }
+  template {
+    it.properties = longProperties
+    it.inputFile = varianceAggregatorInputFile
+    it.outputFile = "org/elasticsearch/compute/aggregation/StdVarianceLongGroupingAggregatorFunction.java"
+  }
+  template {
+    it.properties = doubleProperties
+    it.inputFile = varianceAggregatorInputFile
+    it.outputFile = "org/elasticsearch/compute/aggregation/StdVarianceDoubleGroupingAggregatorFunction.java"
+  }
 }

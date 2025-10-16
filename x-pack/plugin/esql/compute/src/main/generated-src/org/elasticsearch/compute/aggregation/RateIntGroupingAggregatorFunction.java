@@ -76,6 +76,7 @@ public final class RateIntGroupingAggregatorFunction implements GroupingAggregat
         new IntermediateStateDesc("resets", ElementType.DOUBLE)
     );
 
+
     private ObjectArray<Buffer> buffers;
     private final List<Integer> channels;
     private final DriverContext driverContext;

@@ -6,7 +6,7 @@
  */
 package org.elasticsearch.compute.aggregation;
 
-// begin generated imports
+// begin geneStdVarianced imports
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.PriorityQueue;
 import org.elasticsearch.common.util.BigArrays;
@@ -31,18 +31,11 @@ import org.elasticsearch.core.Releasable;
 import org.elasticsearch.core.Releasables;
 
 import java.util.List;
-// end generated imports
+// end geneStdVarianced imports
 
-public final class RateDoubleGroupingAggregatorFunction implements GroupingAggregatorFunction {
+public final class StdVarianceDoubleGroupingAggregatorFunction implements GroupingAggregatorFunction {
 
     public static final class FunctionSupplier implements AggregatorFunctionSupplier {
-        // Overriding constructor to support isRateOverTime flag
-        private final boolean isRateOverTime;
-
-        public FunctionSupplier(boolean isRateOverTime) {
-            this.isRateOverTime = isRateOverTime;
-        }
-
         @Override
         public List<IntermediateStateDesc> nonGroupingIntermediateStateDesc() {
             throw new UnsupportedOperationException("non-grouping aggregator is not supported");
@@ -59,21 +52,20 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
         }
 
         @Override
-        public RateDoubleGroupingAggregatorFunction groupingAggregator(DriverContext driverContext, List<Integer> channels) {
-            return new RateDoubleGroupingAggregatorFunction(channels, driverContext, isRateOverTime);
+        public StdVarianceDoubleGroupingAggregatorFunction groupingAggregator(DriverContext driverContext, List<Integer> channels) {
+            return new StdVarianceDoubleGroupingAggregatorFunction(channels, driverContext);
         }
 
         @Override
         public String describe() {
-            return "rate of double";
+            return "StdVariance of double";
         }
     }
 
     static final List<IntermediateStateDesc> INTERMEDIATE_STATE_DESC = List.of(
         new IntermediateStateDesc("timestamps", ElementType.LONG),
         new IntermediateStateDesc("values", ElementType.DOUBLE),
-        new IntermediateStateDesc("sampleCounts", ElementType.LONG),
-        new IntermediateStateDesc("resets", ElementType.DOUBLE)
+        new IntermediateStateDesc("sampleCounts", ElementType.LONG)
     );
 
 
@@ -82,13 +74,11 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
     private final DriverContext driverContext;
     private final BigArrays bigArrays;
     private ObjectArray<ReducedState> reducedStates;
-    private final boolean isRateOverTime;
 
-    public RateDoubleGroupingAggregatorFunction(List<Integer> channels, DriverContext driverContext, boolean isRateOverTime) {
+    public StdVarianceDoubleGroupingAggregatorFunction(List<Integer> channels, DriverContext driverContext) {
         this.channels = channels;
         this.driverContext = driverContext;
         this.bigArrays = driverContext.bigArrays();
-        this.isRateOverTime = isRateOverTime;
         ObjectArray<Buffer> buffers = driverContext.bigArrays().newObjectArray(256);
         try {
             this.reducedStates = driverContext.bigArrays().newObjectArray(256);
@@ -288,7 +278,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
             return;
         }
         LongVector sampleCounts = ((LongBlock) page.getBlock(channels.get(2))).asVector();
-        DoubleVector resets = ((DoubleBlock) page.getBlock(channels.get(3))).asVector();
         for (int groupPosition = 0; groupPosition < groups.getPositionCount(); groupPosition++) {
             int valuePosition = positionOffset + groupPosition;
             long sampleCount = sampleCounts.getLong(valuePosition);
@@ -304,7 +293,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
             }
             state.appendIntervalsFromBlocks(timestamps, values, valuePosition);
             state.samples += sampleCount;
-            state.resets += resets.getDouble(valuePosition);
         }
     }
 
@@ -317,7 +305,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
             return;
         }
         LongVector sampleCounts = ((LongBlock) page.getBlock(channels.get(2))).asVector();
-        DoubleVector resets = ((DoubleBlock) page.getBlock(channels.get(3))).asVector();
         for (int groupPosition = 0; groupPosition < groups.getPositionCount(); groupPosition++) {
             int valuePosition = positionOffset + groupPosition;
             long sampleCount = sampleCounts.getLong(valuePosition);
@@ -339,7 +326,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
                 }
                 state.appendIntervalsFromBlocks(timestamps, values, valuePosition);
                 state.samples += sampleCount;
-                state.resets += resets.getDouble(valuePosition);
             }
         }
     }
@@ -352,7 +338,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
             var timestamps = blockFactory.newLongBlockBuilder(positionCount * 2);
             var values = blockFactory.newDoubleBlockBuilder(positionCount * 2);
             var sampleCounts = blockFactory.newLongVectorFixedBuilder(positionCount);
-            var resets = blockFactory.newDoubleVectorFixedBuilder(positionCount)
         ) {
             for (int p = 0; p < positionCount; p++) {
                 int group = selected.getInt(p);
@@ -370,18 +355,15 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
                     timestamps.endPositionEntry();
                     values.endPositionEntry();
                     sampleCounts.appendLong(state.samples);
-                    resets.appendDouble(state.resets);
                 } else {
                     timestamps.appendLong(0);
                     values.appendDouble(0);
                     sampleCounts.appendLong(0);
-                    resets.appendDouble(0);
                 }
             }
             blocks[offset] = timestamps.build();
             blocks[offset + 1] = values.build();
             blocks[offset + 2] = sampleCounts.build().asBlock();
-            blocks[offset + 3] = resets.build().asBlock();
         }
     }
 
@@ -413,7 +395,7 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
      * Each slice is sorted in descending order of timestamp. A new slice is created when a data point has a
      * timestamp greater than the last point of the current slice. Since each page is sorted by descending timestamp,
      * we only need to compare the first point of the new page with the last point of the current slice to decide
-     * if a new slice is needed. During merging, a priority queue is used to iterate through the slices, selecting
+     * if a new slice is needed. During merging, a priority queue is used to iteStdVariance through the slices, selecting
      * the slice with the greatest timestamp.
      */
     static final class Buffer implements Releasable {
@@ -493,9 +475,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
                     pq.updateTop();
                 }
                 var val = values.get(position);
-                if (val > prevValue) {
-                    state.resets += val;
-                }
                 prevValue = val;
             }
             state.samples += pendingCount;
@@ -555,33 +534,26 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
     public void evaluateFinal(Block[] blocks, int offset, IntVector selected, GroupingAggregatorEvaluationContext evalContext) {
         BlockFactory blockFactory = driverContext.blockFactory();
         int positionCount = selected.getPositionCount();
-        try (var rates = blockFactory.newDoubleBlockBuilder(positionCount)) {
+        try (var stdVariances = blockFactory.newDoubleBlockBuilder(positionCount)) {
             for (int p = 0; p < positionCount; p++) {
                 int group = selected.getInt(p);
                 var state = flushAndCombineState(group);
                 if (state == null || state.samples < 2) {
-                    rates.appendNull();
+                    stdVariances.appendNull();
                     continue;
                 }
                 // combine intervals for the final evaluation
                 Interval[] intervals = state.intervals;
                 ArrayUtil.timSort(intervals);
-                for (int i = 1; i < intervals.length; i++) {
-                    Interval next = intervals[i - 1]; // reversed
-                    Interval prev = intervals[i];
-                    if (prev.v2 > next.v2) {
-                        state.resets += prev.v2;
-                    }
-                }
-                final double rate;
+                final double stdVariance;
                 if (evalContext instanceof TimeSeriesGroupingAggregatorEvaluationContext tsContext) {
-                    rate = extrapolateRate(state, tsContext.rangeStartInMillis(group), tsContext.rangeEndInMillis(group), isRateOverTime);
+                    stdVariance = extrapolateStdVariance(state, tsContext.rangeStartInMillis(group), tsContext.rangeEndInMillis(group));
                 } else {
-                    rate = computeRateWithoutExtrapolate(state, isRateOverTime);
+                    stdVariance = computeStdVarianceWithoutExtrapolate(state);
                 }
-                rates.appendDouble(rate);
+                stdVariances.appendDouble(stdVariance);
             }
-            blocks[offset] = rates.build();
+            blocks[offset] = stdVariances.build();
         }
     }
 
@@ -618,7 +590,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
     static final class ReducedState {
         private static final Interval[] EMPTY_INTERVALS = new Interval[0];
         long samples;
-        double resets;
         Interval[] intervals = EMPTY_INTERVALS;
 
         void appendInterval(Interval interval) {
@@ -646,34 +617,30 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
         }
     }
 
-    private static double computeRateWithoutExtrapolate(ReducedState state, boolean isRateOverTime) {
-        assert state.samples >= 2 : "rate requires at least two samples; got " + state.samples;
+    private static double computeStdVarianceWithoutExtrapolate(ReducedState state) {
+        assert state.samples >= 2 : "StdVariance requires at least two samples; got " + state.samples;
         final long firstTS = state.intervals[state.intervals.length - 1].t2;
         final long lastTS = state.intervals[0].t1;
         double firstValue = state.intervals[state.intervals.length - 1].v2;
-        double lastValue = state.intervals[0].v1 + state.resets;
-        if (isRateOverTime) {
-            return (lastValue - firstValue) * 1000.0 / (lastTS - firstTS);
-        } else {
-            return lastValue - firstValue;
-        }
+        double lastValue = state.intervals[0].v1;
+        return lastValue - firstValue;
     }
 
     /**
      * Credit to PromQL for this extrapolation algorithm:
-     * If samples are close enough to the rangeStart and rangeEnd, we extrapolate the rate all the way to the boundary in question.
+     * If samples are close enough to the rangeStart and rangeEnd, we extrapolate the StdVariance all the way to the boundary in question.
      * "Close enough" is defined as "up to 10% more than the average duration between samples within the range".
      * Essentially, we assume a more or less regular spacing between samples. If we don't see a sample where we would expect one,
      * we assume the series does not cover the whole range but starts and/or ends within the range.
-     * We still extrapolate the rate in this case, but not all the way to the boundary, only by half of the average duration between
+     * We still extrapolate the StdVariance in this case, but not all the way to the boundary, only by half of the average duration between
      * samples (which is our guess for where the series actually starts or ends).
      */
-    private static double extrapolateRate(ReducedState state, long rangeStart, long rangeEnd, boolean isRateOverTime) {
-        assert state.samples >= 2 : "rate requires at least two samples; got " + state.samples;
+    private static double extrapolateStdVariance(ReducedState state, long rangeStart, long rangeEnd) {
+        assert state.samples >= 2 : "StdVariance requires at least two samples; got " + state.samples;
         final long firstTS = state.intervals[state.intervals.length - 1].t2;
         final long lastTS = state.intervals[0].t1;
         double firstValue = state.intervals[state.intervals.length - 1].v2;
-        double lastValue = state.intervals[0].v1 + state.resets;
+        double lastValue = state.intervals[0].v1;
         final double sampleTS = lastTS - firstTS;
         final double averageSampleInterval = sampleTS / state.samples;
         final double slope = (lastValue - firstValue) / sampleTS;
@@ -691,10 +658,6 @@ public final class RateDoubleGroupingAggregatorFunction implements GroupingAggre
             }
             lastValue = lastValue + endGap * slope;
         }
-        if (isRateOverTime) {
-            return (lastValue - firstValue) * 1000.0 / (rangeEnd - rangeStart);
-        } else {
-            return lastValue - firstValue;
-        }
+        return lastValue - firstValue;
     }
 }
